@@ -14,7 +14,7 @@ namespace BluesScrapeClient
         static BluesScraper _scraper;
         static IMqttClient _mqttClient;
         static IMqttClientOptions _mqttOptions;
-        static readonly string _mqttTopic = "Other/BluesScore";
+        static readonly string _mqttScoreTopic = "Other/BluesScore";
 
         static async Task<int> Main(string[] args)
         {
@@ -124,7 +124,7 @@ namespace BluesScrapeClient
             string json = JsonConvert.SerializeObject(gameInfo);
 
             var message = new MqttApplicationMessageBuilder()
-                .WithTopic(_mqttTopic)
+                .WithTopic(_mqttScoreTopic)
                 .WithAtMostOnceQoS()
                 .WithPayload(json)
                 .Build();
