@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace BluesScrapeClient
 {
-    public enum GameStatuses { NotStarted, InAction, CriticalAction, Intermission, Final = 7}
+    public enum GameStatuses { NotStarted = 1, Preview = 2, InAction = 3, CriticalAction = 4, Intermission, Final = 7}
 
     class BluesScraper
     {
@@ -38,12 +38,19 @@ namespace BluesScrapeClient
 
                 var gameInfo = ExtractData();
                 string gameStatus = GetJsonValue(_gameData["status"]["statusCode"]);
+
                 bool fail = !Enum.TryParse(gameStatus, out GameStatuses status);
 
                 if (fail)
                 {
                     //Failsafe
                     status = GameStatuses.Final;
+                }
+                //End of Period
+                bool gameLive = (status == GameStatuses.InAction || status == GameStatuses.CriticalAction);
+                if (gameInfo.TimeRemaining < 1 && gameLive)
+                {
+                    status = GameStatuses.Intermission;
                 }
 
                 return Tuple.Create(gameInfo, status);
@@ -66,7 +73,8 @@ namespace BluesScrapeClient
             gameInfo.HomeSOG = int.Parse(GetJsonValue(lineScore["teams"]["home"]["shotsOnGoal"]));
             gameInfo.AwaySOG = int.Parse(GetJsonValue(lineScore["teams"]["away"]["shotsOnGoal"]));
             gameInfo.Period = int.Parse(GetJsonValue(lineScore["currentPeriod"]));
-            long.TryParse(GetJsonValue(lineScore["currentPeriodTimeRemaining"]), out gameInfo.TimeRemaining);
+            TimeSpan.TryParse(GetJsonValue(lineScore["currentPeriodTimeRemaining"]), out TimeSpan temp);
+            gameInfo.TimeRemaining = temp.TotalSeconds;
             gameInfo.TimeRemaining = (gameInfo.TimeRemaining == 0) ? -1 : gameInfo.TimeRemaining;
 
             return gameInfo;
@@ -96,7 +104,7 @@ namespace BluesScrapeClient
         public int HomeSOG;
         public int AwayScore;
         public int AwaySOG;
-        public long TimeRemaining;
+        public double TimeRemaining;
         public int Period;
     }
 }

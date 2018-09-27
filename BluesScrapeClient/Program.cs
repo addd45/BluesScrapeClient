@@ -5,6 +5,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.Linq;
 
 namespace BluesScrapeClient
 {
@@ -12,17 +13,25 @@ namespace BluesScrapeClient
     {
         static BluesScraper _scraper;
         static IMqttClient _mqttClient;
+        static IMqttClientOptions _mqttOptions;
         static readonly string _mqttTopic = "Other/BluesScore";
 
-        static async Task Main(string[] args)
+        static async Task<int> Main(string[] args)
         {
             var mqttInit = InitializeMqtt("192.168.0.111", "homeassistant", "sb4517");
+            string arg1 = args.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(arg1))
+            {
+                return -1;
+            }
 
-            int temp = 2017020245;
-            _scraper = new BluesScraper(temp);
+            int gameID = int.Parse(arg1);
+            _scraper = new BluesScraper(gameID);
 
             _mqttClient = await mqttInit;
             await Execute();
+
+            return 0;
         }
 
         static async Task<IMqttClient> InitializeMqtt(string addr, string user, string pw)
@@ -31,7 +40,7 @@ namespace BluesScrapeClient
             var ret = factory.CreateMqttClient();
             ret.Disconnected += Mqtt_Disconnected;
 
-            var options = new MqttClientOptionsBuilder()
+            _mqttOptions = new MqttClientOptionsBuilder()
                 .WithClientId("BluesScraper")
                 .WithTcpServer(addr)
                 .WithCredentials(user, pw)
@@ -40,7 +49,7 @@ namespace BluesScrapeClient
 
             try
             {
-                await ret.ConnectAsync(options);
+                await ret.ConnectAsync(_mqttOptions);
             }
             catch(MqttConnectingFailedException e)
             {
@@ -84,6 +93,8 @@ namespace BluesScrapeClient
                     break;
                 }
 
+                Console.WriteLine($"Sleeping for {delay} ");
+                Console.WriteLine("Game status " + data.Item2.ToString());
                 Thread.Sleep(delay);
             }
         }
@@ -96,7 +107,9 @@ namespace BluesScrapeClient
                     return TimeSpan.FromSeconds(1);
                 case GameStatuses.Intermission:
                 case GameStatuses.NotStarted:
-                    return TimeSpan.FromSeconds(60);
+                    return TimeSpan.FromSeconds(90);
+                case GameStatuses.Preview:
+                    return TimeSpan.FromSeconds(30);
                 case GameStatuses.InAction:
                     return TimeSpan.FromSeconds(5);
                 case GameStatuses.Final:
@@ -117,6 +130,7 @@ namespace BluesScrapeClient
                 .Build();
             try
             {
+                Console.WriteLine($"Sending Message {Environment.NewLine} {json}");
                 await _mqttClient.PublishAsync(message);
             }
             catch(Exception e)
@@ -135,7 +149,16 @@ namespace BluesScrapeClient
             }
             else
             {
-                //TODO retry logic
+                //TODO: Dynamic
+                for(int i=0; i<3; i++)
+                {
+                    await _mqttClient.ConnectAsync(_mqttOptions);
+                    if (_mqttClient.IsConnected)
+                    {
+                        break;
+                    }
+                    else { Thread.Sleep(690); }
+                }
             }
         }
 
