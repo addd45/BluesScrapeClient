@@ -15,6 +15,7 @@ namespace BluesScrapeClient
         static IMqttClient _mqttClient;
         static IMqttClientOptions _mqttOptions;
         static readonly string _mqttScoreTopic = "Other/BluesScore";
+        static readonly string _mqttSettingsTopic = "Other/BluesSettings";
 
         static async Task<int> Main(string[] args)
         {
@@ -22,10 +23,12 @@ namespace BluesScrapeClient
             string arg1 = args.FirstOrDefault();
             if (string.IsNullOrWhiteSpace(arg1))
             {
+                Console.WriteLine("No args provided. exiting");
                 return -1;
             }
 
             int gameID = int.Parse(arg1);
+            Console.WriteLine($"Running with gameID: {gameID}");
             _scraper = new BluesScraper(gameID);
 
             _mqttClient = await mqttInit;
@@ -53,6 +56,7 @@ namespace BluesScrapeClient
             }
             catch(MqttConnectingFailedException e)
             {
+                //TODO: make decisions
                 switch (e.ReturnCode)
                 {
                         //idk
@@ -60,7 +64,8 @@ namespace BluesScrapeClient
                         break;
                         //protocol issue
                     case MQTTnet.Protocol.MqttConnectReturnCode.ConnectionRefusedUnacceptableProtocolVersion:
-                        break;
+                        Console.WriteLine("Protocol Issue with connecting to MQTT. Check connection settings");
+                        throw;
                         //idk
                     case MQTTnet.Protocol.MqttConnectReturnCode.ConnectionRefusedIdentifierRejected:
                         break;
@@ -70,7 +75,8 @@ namespace BluesScrapeClient
                         //auth problem
                     case MQTTnet.Protocol.MqttConnectReturnCode.ConnectionRefusedBadUsernameOrPassword:
                     case MQTTnet.Protocol.MqttConnectReturnCode.ConnectionRefusedNotAuthorized:
-                        break;
+                        Console.WriteLine("Error Authenticating to MQTT. Check that shit");
+                        throw;
                     default:
                         break;
                 }
@@ -135,7 +141,7 @@ namespace BluesScrapeClient
             }
             catch(Exception e)
             {
-
+                Console.WriteLine("Error publishing mqtt message");
             }
         }
 
